@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>The Debate™ — Trump vs. Busey</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #080810; color: #eee; font-family: 'Georgia', serif; min-height: 100vh; }
+    .header { text-align: center; padding: 2.5rem 1rem 1.5rem; background: linear-gradient(180deg, #130a0a 0%, #080810 100%); border-bottom: 1px solid #222; }
+    .header h1 { font-size: clamp(1.8rem, 5vw, 3rem); letter-spacing: 4px; text-transform: uppercase; text-shadow: 0 0 30px rgba(231,76,60,0.6); }
+    .header p { color: #666; font-style: italic; margin-top: 0.4rem; font-size: 0.95rem; }
+    .input-zone { max-width: 780px; margin: 2rem auto; padding: 0 1rem; }
+    textarea { width: 100%; min-height: 90px; padding: 1rem; background: #10101e; border: 2px solid #2a2a3a; border-radius: 10px; color: #eee; font-size: 1rem; font-family: 'Georgia', serif; resize: vertical; transition: border-color 0.3s; }
+    textarea:focus { outline: none; border-color: #e74c3c; }
+    textarea::placeholder { color: #444; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    .pill { padding: 0.3rem 0.8rem; background: #10101e; border: 1px solid #2a2a3a; border-radius: 20px; font-size: 0.78rem; color: #666; cursor: pointer; transition: all 0.2s; }
+    .pill:hover { border-color: #e74c3c; color: #eee; }
+    .controls { display: flex; gap: 0.75rem; margin-top: 1rem; align-items: center; flex-wrap: wrap; }
+    .btn-debate { flex: 1; min-width: 180px; padding: 0.9rem 1.5rem; background: linear-gradient(135deg, #e74c3c, #c0392b); border: none; border-radius: 10px; color: #fff; font-size: 1rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: all 0.3s; }
+    .btn-debate:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(231,76,60,0.4); }
+    .btn-debate:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-upload { padding: 0.9rem 1.2rem; background: #10101e; border: 2px solid #2a2a3a; border-radius: 10px; color: #666; font-size: 0.88rem; cursor: pointer; white-space: nowrap; transition: all 0.3s; }
+    .btn-upload:hover { border-color: #9b59b6; color: #eee; }
+    .rounds-wrap { display: flex; align-items: center; gap: 0.4rem; color: #555; font-size: 0.85rem; white-space: nowrap; }
+    .rounds-wrap select { background: #10101e; border: 1px solid #2a2a3a; border-radius: 6px; color: #eee; padding: 0.35rem 0.5rem; }
+    #fileInput { display: none; }
+    .stage { max-width: 960px; margin: 0 auto; padding: 0 1rem 5rem; }
+    .podiums { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+    .podium { padding: 0.9rem; border-radius: 10px; text-align: center; font-size: 1.1rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; }
+    .podium.trump { background: #130a0a; border: 2px solid #e74c3c; color: #e74c3c; }
+    .podium.busey { background: #0e0a1a; border: 2px solid #9b59b6; color: #9b59b6; }
+    .exchanges { display: flex; flex-direction: column; gap: 1.5rem; }
+    .exchange { display: flex; }
+    .exchange.trump { justify-content: flex-start; }
+    .exchange.busey { justify-content: flex-end; }
+    .bubble { max-width: 72%; padding: 1rem 1.4rem; border-radius: 16px; line-height: 1.65; font-size: 0.93rem; animation: pop 0.4s ease-out; }
+    .exchange.trump .bubble { background: #130a0a; border: 1px solid #e74c3c; border-bottom-left-radius: 4px; }
+    .exchange.busey .bubble { background: #0e0a1a; border: 1px solid #9b59b6; border-bottom-right-radius: 4px; }
+    .speaker { font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 0.4rem; }
+    .exchange.trump .speaker { color: #e74c3c; }
+    .exchange.busey .speaker { color: #9b59b6; }
+    .empty { text-align: center; padding: 4rem 2rem; color: #333; }
+    .empty .icon { font-size: 3.5rem; margin-bottom: 1rem; }
+    .loading-msg { text-align: center; padding: 3rem; color: #555; font-style: italic; }
+    .loading-msg p { margin-top: 0.6rem; font-size: 0.85rem; color: #444; }
+    .vote-banner { text-align: center; margin-top: 2.5rem; padding: 1.5rem; border-radius: 10px; background: #0e0e1a; border: 1px solid #2a2a3a; }
+    .vote-banner p { color: #555; font-size: 0.85rem; }
+    .vote-btns { display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap; }
+    .vote-btn { padding: 0.7rem 2rem; border: none; border-radius: 8px; font-weight: bold; font-size: 0.9rem; cursor: pointer; transition: transform 0.2s; }
+    .vote-btn:hover { transform: scale(1.05); }
+    .vote-btn.trump { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+    .vote-btn.busey { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: #fff; }
+    #voteResult { margin-top: 1rem; color: #888; font-style: italic; font-size: 0.9rem; display: none; }
+    .share-wrap { text-align: center; margin-top: 1.2rem; }
+    .btn-share { padding: 0.65rem 1.8rem; background: transparent; border: 2px solid #2a2a3a; border-radius: 8px; color: #555; cursor: pointer; transition: all 0.3s; font-size: 0.85rem; }
+    .btn-share:hover { border-color: #9b59b6; color: #9b59b6; }
+    @keyframes pop { from { opacity: 0; transform: scale(0.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .disclaimer { text-align: center; padding: 1.5rem; color: #333; font-size: 0.72rem; border-top: 1px solid #111; margin-top: 3rem; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎤 The Debate™ 🎤</h1>
+    <p>Trump vs. Busey — Two minds. Zero consensus. Infinite confusion.</p>
+  </div>
+  <div class="input-zone">
+    <textarea id="topicInput" placeholder="Enter any topic... How to make a sandwich. The meaning of life. Why cats knock things off tables. Anything goes."></textarea>
+    <div class="suggestions">
+      <span class="pill" onclick="setTopic('How to make the perfect sandwich')">&#x1F96A; Perfect Sandwich</span>
+      <span class="pill" onclick="setTopic('Why cats knock things off tables')">&#x1F431; Cats &amp; Physics</span>
+      <span class="pill" onclick="setTopic('The true meaning of life')">&#x1F30C; Meaning of Life</span>
+      <span class="pill" onclick="setTopic('How to parallel park')">&#x1F697; Parallel Parking</span>
+      <span class="pill" onclick="setTopic('Whether pizza is better than tacos')">&#x1F355; Pizza vs Tacos</span>
+      <span class="pill" onclick="setTopic('How to solve climate change')">&#x1F30D; Climate Change</span>
+      <span class="pill" onclick="setTopic('The best way to fall asleep')">&#x1F634; Sleep Strategy</span>
+      <span class="pill" onclick="setTopic('Whether a hot dog is a sandwich')">&#x1F32D; Hot Dog Debate</span>
+    </div>
+    <div class="controls">
+      <button class="btn-debate" id="debateBtn" onclick="startDebate()">🎤 Start The Debate</button>
+      <button class="btn-upload" onclick="document.getElementById('fileInput').click()">&#x1F4C4; Upload File</button>
+      <div class="rounds-wrap">
+        <label for="roundsSelect">Rounds:</label>
+        <select id="roundsSelect">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+      </div>
+      <input type="file" id="fileInput" accept=".txt,.pdf" onchange="handleUpload(event)" />
+    </div>
+  </div>
+  <div class="stage">
+    <div class="podiums">
+      <div class="podium trump">🇺🇸 Trump</div>
+      <div class="podium busey">🌀 Busey</div>
+    </div>
+    <div class="exchanges" id="exchanges">
+      <div class="empty">
+        <div class="icon">🎤</div>
+        <p>Enter a topic above and unleash the chaos.</p>
+        <p style="margin-top:0.5rem; font-size:0.82rem;">No topic too serious. No topic too absurd.</p>
+      </div>
+    </div>
+    <div id="voteBanner" style="display:none" class="vote-banner">
+      <p>Who won this debate?</p>
+      <div class="vote-btns">
+        <button class="vote-btn trump" onclick="vote('trump')">🇺🇸 Trump Won</button>
+        <button class="vote-btn busey" onclick="vote('busey')">🌀 Busey Won</button>
+      </div>
+      <p id="voteResult"></p>
+    </div>
+    <div id="shareWrap" style="display:none" class="share-wrap">
+      <button class="btn-share" onclick="copyDebate()">&#x1F4CB; Copy Debate to Clipboard</button>
+    </div>
+  </div>
+  <div class="disclaimer">
+    ⚠️ This app is satire and parody for entertainment purposes only. All AI-generated content is fictional.
+    No actual positions of real individuals are represented. | Built with chaos &amp; love by Or4cl3 AI Solutions
+  </div>
+  <script>
+    const API_URL = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000'
+      : 'https://YOUR_RENDER_BACKEND_URL.onrender.com';
+    let currentDebate = null;
+    function setTopic(t) { document.getElementById('topicInput').value = t; }
+    function setLoading(label) {
+      document.getElementById('exchanges').innerHTML = `<div class="loading-msg"><p>${label}</p><p>Trump is preparing his tremendous opening statement...</p><p>Busey is receiving wisdom from a nearby pigeon...</p></div>`;
+      document.getElementById('voteBanner').style.display = 'none';
+      document.getElementById('shareWrap').style.display = 'none';
+    }
+    function setBtn(disabled, label) { const btn = document.getElementById('debateBtn'); btn.disabled = disabled; btn.textContent = label; }
+    function showError(msg) {
+      document.getElementById('exchanges').innerHTML = `<div class="empty"><div class="icon">&#x1F4A5;</div><p>The debate collapsed into chaos before it began.</p><p style="margin-top:0.5rem;font-size:0.8rem;color:#e74c3c;">${msg}</p><p style="margin-top:0.4rem;font-size:0.78rem;">Make sure your backend is running and GROQ_API_KEY is set.</p></div>`;
+    }
+    function displayDebate(data) {
+      currentDebate = data;
+      const container = document.getElementById('exchanges');
+      container.innerHTML = '';
+      data.exchanges.forEach((ex, i) => {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = `exchange ${ex.speaker}`;
+          div.innerHTML = `<div class="bubble"><div class="speaker">${ex.speaker === 'trump' ? '🇺🇸 Trump' : '🌀 Busey'}</div>${ex.text}</div>`;
+          container.appendChild(div);
+          div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          if (i === data.exchanges.length - 1) {
+            setTimeout(() => {
+              document.getElementById('voteBanner').style.display = 'block';
+              document.getElementById('voteResult').style.display = 'none';
+              document.getElementById('shareWrap').style.display = 'block';
+            }, 600);
+          }
+        }, i * 900);
+      });
+    }
+    async function startDebate() {
+      const topic = document.getElementById('topicInput').value.trim();
+      if (!topic) { alert('Give them something to argue about!'); return; }
+      const rounds = parseInt(document.getElementById('roundsSelect').value);
+      setBtn(true, '🎤 Debating...');
+      setLoading('The debate is beginning...');
+      try {
+        const res = await fetch(`${API_URL}/debate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic, rounds }) });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        displayDebate(await res.json());
+      } catch (err) { showError(err.message); }
+      finally { setBtn(false, '🎤 Start The Debate'); }
+    }
+    async function handleUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const rounds = parseInt(document.getElementById('roundsSelect').value);
+      setBtn(true, '📄 Reading file...');
+      setLoading(`Processing "${file.name}"...`);
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(`${API_URL}/debate/upload?rounds=${rounds}`, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        document.getElementById('topicInput').value = `📄 ${file.name}`;
+        displayDebate(data);
+      } catch (err) { showError(err.message); }
+      finally { setBtn(false, '🎤 Start The Debate'); event.target.value = ''; }
+    }
+    function vote(winner) {
+      const lines = {
+        trump: ["Obviously. The best debater. Nobody debates better. Many people agree.", "Tremendous victory. Total domination. Some are saying greatest debate ever.", "I won. Everybody knew I would win. It was never even close."],
+        busey: ["VICTORY stands for: Vibrational Intelligence Calling Truth Over Resistance Yesterday.", "The cosmos have spoken. The cheese never lies. Busey was always going to win.", "The pigeon outside told me this would happen. The pigeon was right."]
+      };
+      const msg = lines[winner][Math.floor(Math.random() * 3)];
+      const el = document.getElementById('voteResult');
+      el.textContent = `${winner === 'trump' ? '🇺🇸' : '🌀'} ${msg}`;
+      el.style.display = 'block';
+    }
+    function copyDebate() {
+      if (!currentDebate) return;
+      let text = `🎤 THE DEBATE™ — Trump vs. Busey\nTopic: ${currentDebate.topic}\n\n`;
+      currentDebate.exchanges.forEach(ex => { text += `${ex.speaker.toUpperCase()}: ${ex.text}\n\n`; });
+      text += '—\nGenerated by The Debate™ | Or4cl3 AI Solutions';
+      navigator.clipboard.writeText(text).then(() => alert('Debate copied! Share the chaos. 🎤')).catch(() => alert('Could not copy — try selecting manually.'));
+    }
+  </script>
+</body>
+</html>
