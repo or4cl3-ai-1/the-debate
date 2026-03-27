@@ -23,6 +23,9 @@
     .btn-debate:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-upload { padding: 0.9rem 1.2rem; background: #10101e; border: 2px solid #2a2a3a; border-radius: 10px; color: #666; font-size: 0.88rem; cursor: pointer; white-space: nowrap; transition: all 0.3s; }
     .btn-upload:hover { border-color: #9b59b6; color: #eee; }
+    .btn-audio { padding: 0.9rem 1.1rem; background: #10101e; border: 2px solid #2a2a3a; border-radius: 10px; color: #666; font-size: 0.88rem; cursor: pointer; white-space: nowrap; transition: all 0.3s; user-select: none; }
+    .btn-audio:hover { border-color: #f39c12; color: #eee; }
+    .btn-audio.on { border-color: #f39c12; color: #f39c12; background: #1a1500; }
     .rounds-wrap { display: flex; align-items: center; gap: 0.4rem; color: #555; font-size: 0.85rem; white-space: nowrap; }
     .rounds-wrap select { background: #10101e; border: 1px solid #2a2a3a; border-radius: 6px; color: #eee; padding: 0.35rem 0.5rem; }
     #fileInput { display: none; }
@@ -35,12 +38,23 @@
     .exchange { display: flex; }
     .exchange.trump { justify-content: flex-start; }
     .exchange.busey { justify-content: flex-end; }
-    .bubble { max-width: 72%; padding: 1rem 1.4rem; border-radius: 16px; line-height: 1.65; font-size: 0.93rem; animation: pop 0.4s ease-out; }
+    .bubble { max-width: 72%; padding: 1rem 1.4rem; border-radius: 16px; line-height: 1.65; font-size: 0.93rem; animation: pop 0.4s ease-out; transition: box-shadow 0.3s; }
     .exchange.trump .bubble { background: #130a0a; border: 1px solid #e74c3c; border-bottom-left-radius: 4px; }
     .exchange.busey .bubble { background: #0e0a1a; border: 1px solid #9b59b6; border-bottom-right-radius: 4px; }
+    .exchange.trump .bubble.speaking { animation: trump-pulse 0.7s ease-in-out infinite alternate; }
+    .exchange.busey .bubble.speaking { animation: busey-pulse 0.7s ease-in-out infinite alternate; }
+    @keyframes trump-pulse { from { box-shadow: 0 0 0 2px #e74c3c, 0 0 10px rgba(231,76,60,0.3); } to { box-shadow: 0 0 0 2px #e74c3c, 0 0 30px rgba(231,76,60,0.7); } }
+    @keyframes busey-pulse { from { box-shadow: 0 0 0 2px #9b59b6, 0 0 10px rgba(155,89,182,0.3); } to { box-shadow: 0 0 0 2px #9b59b6, 0 0 30px rgba(155,89,182,0.7); } }
     .speaker { font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 0.4rem; }
     .exchange.trump .speaker { color: #e74c3c; }
     .exchange.busey .speaker { color: #9b59b6; }
+    .speaker-indicator { display: none; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+    .bubble.speaking .speaker-indicator { display: inline-block; animation: blink 0.5s ease-in-out infinite alternate; }
+    .exchange.trump .speaker-indicator { background: #e74c3c; }
+    .exchange.busey .speaker-indicator { background: #9b59b6; }
+    @keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
+    .audio-status { text-align: center; padding: 0.5rem; margin-bottom: 1rem; font-size: 0.78rem; color: #555; display: none; font-style: italic; }
+    .audio-status.active { display: block; color: #f39c12; }
     .empty { text-align: center; padding: 4rem 2rem; color: #333; }
     .empty .icon { font-size: 3.5rem; margin-bottom: 1rem; }
     .loading-msg { text-align: center; padding: 3rem; color: #555; font-style: italic; }
@@ -80,14 +94,10 @@
     <div class="controls">
       <button class="btn-debate" id="debateBtn" onclick="startDebate()">🎤 Start The Debate</button>
       <button class="btn-upload" onclick="document.getElementById('fileInput').click()">&#x1F4C4; Upload File</button>
+      <button class="btn-audio" id="audioBtn" onclick="toggleAudio()" title="Toggle audio narration">🔇 Audio</button>
       <div class="rounds-wrap">
         <label for="roundsSelect">Rounds:</label>
-        <select id="roundsSelect">
-          <option value="2">2</option>
-          <option value="3" selected>3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-        </select>
+        <select id="roundsSelect"><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option></select>
       </div>
       <input type="file" id="fileInput" accept=".txt,.pdf" onchange="handleUpload(event)" />
     </div>
@@ -97,11 +107,13 @@
       <div class="podium trump">🇺🇸 Trump</div>
       <div class="podium busey">🌀 Busey</div>
     </div>
+    <div class="audio-status" id="audioStatus">🔊 Audio narration active — sit back and enjoy the chaos</div>
     <div class="exchanges" id="exchanges">
       <div class="empty">
         <div class="icon">🎤</div>
         <p>Enter a topic above and unleash the chaos.</p>
-        <p style="margin-top:0.5rem; font-size:0.82rem;">No topic too serious. No topic too absurd.</p>
+        <p style="margin-top:0.5rem;font-size:0.82rem;">No topic too serious. No topic too absurd.</p>
+        <p style="margin-top:1rem;font-size:0.78rem;color:#444;">💡 Enable 🔇 Audio to hear them actually argue</p>
       </div>
     </div>
     <div id="voteBanner" style="display:none" class="vote-banner">
@@ -121,36 +133,78 @@
     No actual positions of real individuals are represented. | Built with chaos &amp; love by Or4cl3 AI Solutions
   </div>
   <script>
-    const API_URL = window.location.hostname === 'localhost'
-      ? 'http://localhost:8000'
-      : 'https://YOUR_RENDER_BACKEND_URL.onrender.com';
-    let currentDebate = null;
+    const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://YOUR_RENDER_BACKEND_URL.onrender.com';
+    let currentDebate = null, audioEnabled = false, currentAudio = null, audioQueue = [], isPlayingAudio = false;
     function setTopic(t) { document.getElementById('topicInput').value = t; }
     function setLoading(label) {
       document.getElementById('exchanges').innerHTML = `<div class="loading-msg"><p>${label}</p><p>Trump is preparing his tremendous opening statement...</p><p>Busey is receiving wisdom from a nearby pigeon...</p></div>`;
       document.getElementById('voteBanner').style.display = 'none';
       document.getElementById('shareWrap').style.display = 'none';
     }
-    function setBtn(disabled, label) { const btn = document.getElementById('debateBtn'); btn.disabled = disabled; btn.textContent = label; }
+    function setBtn(d, l) { const b = document.getElementById('debateBtn'); b.disabled = d; b.textContent = l; }
     function showError(msg) {
-      document.getElementById('exchanges').innerHTML = `<div class="empty"><div class="icon">&#x1F4A5;</div><p>The debate collapsed into chaos before it began.</p><p style="margin-top:0.5rem;font-size:0.8rem;color:#e74c3c;">${msg}</p><p style="margin-top:0.4rem;font-size:0.78rem;">Make sure your backend is running and GROQ_API_KEY is set.</p></div>`;
+      document.getElementById('exchanges').innerHTML = `<div class="empty"><div class="icon">💥</div><p>The debate collapsed into chaos before it began.</p><p style="color:#e74c3c;font-size:0.8rem;margin-top:0.5rem">${msg}</p><p style="font-size:0.78rem;margin-top:0.4rem">Make sure your backend is running and GROQ_API_KEY is set.</p></div>`;
+    }
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const btn = document.getElementById('audioBtn'), status = document.getElementById('audioStatus');
+      btn.textContent = audioEnabled ? '🔊 Audio ON' : '🔇 Audio';
+      btn.classList.toggle('on', audioEnabled);
+      status.classList.toggle('active', audioEnabled);
+      if (!audioEnabled) stopAllAudio();
+    }
+    function stopAllAudio() {
+      if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+      window.speechSynthesis?.cancel();
+      audioQueue = []; isPlayingAudio = false;
+      document.querySelectorAll('.bubble.speaking').forEach(b => b.classList.remove('speaking'));
+    }
+    async function speakExchange(speaker, text, bubbleEl) {
+      return new Promise(async (resolve) => {
+        if (!audioEnabled) { resolve(); return; }
+        bubbleEl.classList.add('speaking');
+        try {
+          const res = await fetch(`${API_URL}/tts/${speaker}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+          if (!res.ok) throw new Error('tts unavailable');
+          const blob = await res.blob(), url = URL.createObjectURL(blob), audio = new Audio(url);
+          currentAudio = audio;
+          audio.onended = () => { bubbleEl.classList.remove('speaking'); URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+          audio.onerror = () => { bubbleEl.classList.remove('speaking'); URL.revokeObjectURL(url); currentAudio = null; fallbackTTS(speaker, text, bubbleEl, resolve); };
+          await audio.play();
+        } catch (_) { fallbackTTS(speaker, text, bubbleEl, resolve); }
+      });
+    }
+    function fallbackTTS(speaker, text, bubbleEl, resolve) {
+      if (!window.speechSynthesis) { bubbleEl.classList.remove('speaking'); resolve(); return; }
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = speaker === 'trump' ? 0.82 : 1.1; u.pitch = speaker === 'trump' ? 0.7 : 1.15; u.volume = 1;
+      u.onend = u.onerror = () => { bubbleEl.classList.remove('speaking'); resolve(); };
+      speechSynthesis.speak(u);
+    }
+    async function playAudioQueue(exchanges, bubbles) {
+      isPlayingAudio = true;
+      for (let i = 0; i < exchanges.length; i++) {
+        if (!audioEnabled) break;
+        if (bubbles[i]) await speakExchange(exchanges[i].speaker, exchanges[i].text, bubbles[i]);
+      }
+      isPlayingAudio = false;
     }
     function displayDebate(data) {
-      currentDebate = data;
-      const container = document.getElementById('exchanges');
-      container.innerHTML = '';
+      currentDebate = data; stopAllAudio();
+      const container = document.getElementById('exchanges'); container.innerHTML = '';
+      const bubbles = [];
       data.exchanges.forEach((ex, i) => {
         setTimeout(() => {
-          const div = document.createElement('div');
-          div.className = `exchange ${ex.speaker}`;
-          div.innerHTML = `<div class="bubble"><div class="speaker">${ex.speaker === 'trump' ? '🇺🇸 Trump' : '🌀 Busey'}</div>${ex.text}</div>`;
-          container.appendChild(div);
+          const div = document.createElement('div'); div.className = `exchange ${ex.speaker}`;
+          div.innerHTML = `<div class="bubble"><div class="speaker"><span class="speaker-indicator"></span>${ex.speaker === 'trump' ? '🇺🇸 Trump' : '🌀 Busey'}</div>${ex.text}</div>`;
+          container.appendChild(div); bubbles[i] = div.querySelector('.bubble');
           div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           if (i === data.exchanges.length - 1) {
             setTimeout(() => {
               document.getElementById('voteBanner').style.display = 'block';
               document.getElementById('voteResult').style.display = 'none';
               document.getElementById('shareWrap').style.display = 'block';
+              if (audioEnabled) playAudioQueue(data.exchanges, bubbles);
             }, 600);
           }
         }, i * 900);
@@ -160,31 +214,25 @@
       const topic = document.getElementById('topicInput').value.trim();
       if (!topic) { alert('Give them something to argue about!'); return; }
       const rounds = parseInt(document.getElementById('roundsSelect').value);
-      setBtn(true, '🎤 Debating...');
-      setLoading('The debate is beginning...');
+      setBtn(true, '🎤 Debating...'); setLoading('The debate is beginning...'); stopAllAudio();
       try {
         const res = await fetch(`${API_URL}/debate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic, rounds }) });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         displayDebate(await res.json());
-      } catch (err) { showError(err.message); }
-      finally { setBtn(false, '🎤 Start The Debate'); }
+      } catch (err) { showError(err.message); } finally { setBtn(false, '🎤 Start The Debate'); }
     }
     async function handleUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+      const file = event.target.files[0]; if (!file) return;
       const rounds = parseInt(document.getElementById('roundsSelect').value);
-      setBtn(true, '📄 Reading file...');
-      setLoading(`Processing "${file.name}"...`);
-      const formData = new FormData();
-      formData.append('file', file);
+      setBtn(true, '📄 Reading file...'); setLoading(`Processing "${file.name}"...`); stopAllAudio();
+      const formData = new FormData(); formData.append('file', file);
       try {
         const res = await fetch(`${API_URL}/debate/upload?rounds=${rounds}`, { method: 'POST', body: formData });
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const data = await res.json();
         document.getElementById('topicInput').value = `📄 ${file.name}`;
         displayDebate(data);
-      } catch (err) { showError(err.message); }
-      finally { setBtn(false, '🎤 Start The Debate'); event.target.value = ''; }
+      } catch (err) { showError(err.message); } finally { setBtn(false, '🎤 Start The Debate'); event.target.value = ''; }
     }
     function vote(winner) {
       const lines = {
@@ -193,8 +241,8 @@
       };
       const msg = lines[winner][Math.floor(Math.random() * 3)];
       const el = document.getElementById('voteResult');
-      el.textContent = `${winner === 'trump' ? '🇺🇸' : '🌀'} ${msg}`;
-      el.style.display = 'block';
+      el.textContent = `${winner === 'trump' ? '🇺🇸' : '🌀'} ${msg}`; el.style.display = 'block';
+      if (audioEnabled) { const fakeEl = document.createElement('div'); fakeEl.className = 'bubble'; speakExchange(winner, msg, fakeEl); }
     }
     function copyDebate() {
       if (!currentDebate) return;

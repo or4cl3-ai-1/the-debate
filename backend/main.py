@@ -1,7 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from groq import Groq
+import edge_tts
 import PyPDF2
 import io
 import os
@@ -20,7 +21,11 @@ app.add_middleware(
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# ─────────────────────────────────────────────
+TTS_VOICES = {
+    "trump": "en-US-ChristopherNeural",
+    "busey": "en-US-TonyNeural",
+}
+
 TRUMP_SYSTEM = """You are a satirical comedy character based on the publicly parodied persona of Donald Trump — 
 as seen on SNL, late night TV, and countless parody accounts. You are NOT the real Donald Trump. 
 You are a fictional exaggerated comedy character for entertainment purposes only.
@@ -65,6 +70,9 @@ class DebateResponse(BaseModel):
     topic: str
     exchanges: list[Exchange]
 
+class TTSRequest(BaseModel):
+    text: str
+
 def get_persona_response(system_prompt: str, messages: list) -> str:
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -74,42 +82,29 @@ def get_persona_response(system_prompt: str, messages: list) -> str:
     )
     return response.choices[0].message.content.strip()
 
-
 def run_debate(topic: str, rounds: int) -> list[Exchange]:
     rounds = min(max(rounds, 1), 6)
     exchanges = []
     trump_history = []
     busey_history = []
 
-    trump_history.append({
-        "role": "user",
-        "content": f"The debate topic is: \"{topic}\". Open the debate with your position."
-    })
+    trump_history.append({"role": "user", "content": f"The debate topic is: \"{topic}\". Open the debate with your position."})
     trump_text = get_persona_response(TRUMP_SYSTEM, trump_history)
     trump_history.append({"role": "assistant", "content": trump_text})
     exchanges.append(Exchange(speaker="trump", text=trump_text))
 
-    busey_history.append({
-        "role": "user",
-        "content": f"The debate topic is: \"{topic}\". Trump just said: \"{trump_text}\". Share your perspective."
-    })
+    busey_history.append({"role": "user", "content": f"The debate topic is: \"{topic}\". Trump just said: \"{trump_text}\". Share your perspective."})
     busey_text = get_persona_response(BUSEY_SYSTEM, busey_history)
     busey_history.append({"role": "assistant", "content": busey_text})
     exchanges.append(Exchange(speaker="busey", text=busey_text))
 
     for _ in range(rounds - 1):
-        trump_history.append({
-            "role": "user",
-            "content": f"Busey just said: \"{busey_text}\". Respond and continue the debate about {topic}."
-        })
+        trump_history.append({"role": "user", "content": f"Busey just said: \"{busey_text}\". Respond and continue the debate about {topic}."})
         trump_text = get_persona_response(TRUMP_SYSTEM, trump_history)
         trump_history.append({"role": "assistant", "content": trump_text})
         exchanges.append(Exchange(speaker="trump", text=trump_text))
 
-        busey_history.append({
-            "role": "user",
-            "content": f"Trump just said: \"{trump_text}\". Respond with your cosmic perspective on {topic}."
-        })
+        busey_history.append({"role": "user", "content": f"Trump just said: \"{trump_text}\". Respond with your cosmic perspective on {topic}."})
         busey_text = get_persona_response(BUSEY_SYSTEM, busey_history)
         busey_history.append({"role": "assistant", "content": busey_text})
         exchanges.append(Exchange(speaker="busey", text=busey_text))
@@ -118,11 +113,7 @@ def run_debate(topic: str, rounds: int) -> list[Exchange]:
 
 @app.get("/")
 def root():
-    return {
-        "app": "The Debate™",
-        "tagline": "Two minds. Zero consensus. Infinite confusion.",
-        "status": "ready to rumble"
-    }
+    return {"app": "The Debate™", "tagline": "Two minds. Zero consensus. Infinite confusion.", "status": "ready to rumble"}
 
 @app.post("/debate", response_model=DebateResponse)
 def create_debate(request: DebateRequest):
@@ -135,7 +126,6 @@ def create_debate(request: DebateRequest):
 async def debate_from_file(file: UploadFile = File(...), rounds: int = 3):
     content = await file.read()
     topic_text = ""
-
     if file.filename.endswith(".pdf"):
         try:
             pdf = PyPDF2.PdfReader(io.BytesIO(content))
@@ -148,10 +138,30 @@ async def debate_from_file(file: UploadFile = File(...), rounds: int = 3):
         topic_text = content.decode("utf-8", errors="ignore")[:1500].strip()
     else:
         raise HTTPException(status_code=400, detail="Supported file types: .pdf, .txt")
-
     if not topic_text:
         raise HTTPException(status_code=400, detail="Could not extract text from file.")
-
     topic_label = f'the contents of "{file.filename}"'
     exchanges = run_debate(f"{topic_label}: {topic_text}", rounds)
     return DebateResponse(topic=topic_label, exchanges=exchanges)
+
+@app.post("/tts/{speaker}")
+async def text_to_speech(speaker: str, request: TTSRequest):
+    voice = TTS_VOICES.get(speaker.lower(), "en-US-GuyNeural")
+    try:
+        communicate = edge_tts.Communicate(request.text, voice)
+        audio_chunks = []
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_chunks.append(chunk["data"])
+        audio_data = b"".join(audio_chunks)
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={"Cache-Control": "no-cache", "Accept-Ranges": "bytes"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TTS failed: {str(e)}")
+
+@app.get("/tts/voices")
+async def list_voices():
+    return {"voices": TTS_VOICES}
